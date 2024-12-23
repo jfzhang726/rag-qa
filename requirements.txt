@@ -1,4 +1,10 @@
 langchain
+langchainhub 
+langchain_chroma
+langchain-openai
+langchain-pinecone
+chromadb
 openai
+pydantic<2
 ragas
 unstructured[pdf]
