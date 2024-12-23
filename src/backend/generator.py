@@ -1,7 +1,7 @@
 
-from typing import List
-import streamlit as st
+# backend/generator.py
 
+from typing import List
 from langchain import hub
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -9,6 +9,9 @@ from langchain_core.documents import Document
 
 from backend.interfaces import IVectorStore
 from backend.interfaces import ILLMService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 rag_prompt_template = hub.pull("rlm/rag-prompt")
@@ -39,6 +42,6 @@ def generate_response(query_text:str, vector_store: IVectorStore, llm_service: I
         # st.write("Response generated successfully.")
         # return response
     except Exception as e:
-        st.error(f"Error generating response: {e}")
-        st.stop()
+        logger.error(f"Error generating response: {e}")
+        raise e
     

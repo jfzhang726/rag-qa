@@ -43,6 +43,9 @@ def upload_document(request: UpdateRequest,
         logger.error(f"Error processing request: {e}")
         raise HTTPException(status_code=500, detail="Error processing request")
     
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/", summary="Root endpoint")
+def read_root():
+    """
+    Root endpoint to verify that the API is running.
+    """
+    return {"message": "Welcome to the RAG FastAPI Application!"}
