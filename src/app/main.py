@@ -1,89 +1,87 @@
 import streamlit as st 
-from app.utils.streamlit_helpers import create_spinner 
-from backend.data_loader import process_documents
-from backend.interfaces import IVectorStore, ILLMService
-from backend.dependency_factory import DependencyFactory
-from backend.generator import generate_response
+import requests
+from io import BytesIO
+import os
+from dotenv import load_dotenv
+
 
 import logging
 
 logger = logging.getLogger("Streamlit")
 
-@st.cache_resource 
-def get_vector_store() -> IVectorStore:
-    return DependencyFactory.get_vector_store()
+load_dotenv()
 
-@st.cache_resource
-def get_llm_service() -> ILLMService:
-    return DependencyFactory.get_llm_service()
+FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8001/api")
+STORAGE_TYPE = os.getenv("RAW_FILE_STORAGE_TYPE", "local")
 
-
-
-
-def ask_questions():
-    st.title("Ask Questions")
-    st.write("This is a demo of RAG using  gpt-4o-mini model.")
-
-    query_text = st.text_input(
-        "Enter your query",
-        placeholder="Enter your query here"
-        )
-
-    result = None
-
-    with st.form(key="qa_form", clear_on_submit=False, border=False):
-        submitted = st.form_submit_button(label="Submit", disabled=not query_text)
-        if submitted:
-            try:
-                st.write("Generating response...")
-                vector_store = get_vector_store()
-                llm_service = get_llm_service()
-                response = generate_response(query_text, vector_store, llm_service)
-                result = response
-                st.write("Response generated successfully.")
-            except Exception as e:
-                st.error(f"Error generating response: {e}")
-                st.stop()
-    if result is not None:
-        st.info(result)
+def list_files():
+    try:
+        response = requests.get(f"{FASTAPI_URL}/files")
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"Error listing files: {response.text}")
+            return []
+    except Exception as e:
+        logger.error(f"Error listing files: {e}")
+        return []
 
 
-def upload_documents():
-    st.title("Upload Documents")
+def main():
+    st.title("Retrieval-Augmented Generation (RAG) Demo")
 
-    uploaded_files = st.file_uploader(
-        "Choose a file",
-        type=['pdf', 'txt'],
-        accept_multiple_files=True)
-
-    if uploaded_files:
-        with st.form(key="upload_form", clear_on_submit=True):
-            submitted = st.form_submit_button("Upload")
-            if submitted:
+    menu = ["Home", "Ask Questions", "Upload Documents", "Manage Documents"]
+    choice = st.sidebar.selectbox("Menu", menu)
+    if choice == "Home":
+        st.subheader("Welcome to the RAG demo!")
+        st.write("Use the sidebar to navigate to different sections of the demo.")
+    elif choice == "Upload Documents":
+        st.subheader("Upload Documents")
+        uploaded_file = st.file_uploader("Choose a file", type=['pdf', 'txt'], accept_multiple_files=False)
+        if st.button("Upload"):
+            if uploaded_file:
+                files = {"file": (uploaded_file.name, uploaded_file, uploaded_file.type)}
                 try:
-                    # Process and store documents
-                    st.write("Uploading documents...")
-                    vector_store = get_vector_store()
-                    texts = [f.read().decode("utf-8") for f in uploaded_files]
-                    logger.info(f"uploaded content size {len(texts)}")
-                    documents = process_documents(texts)
-                    logger.info(f"processed documents: {len(documents)}")
-                    vector_store.add_documents(documents)
-                    st.success("Documents uploaded successfully!")
-                    
+                    response = requests.post(f"{FASTAPI_URL}/upload", files=files)
+                    if response.status_code == 200:
+                        uuid = response.json().get("uuid")
+                        st.success(f"File uploaded successfully! UUID: {uuid}")
+                    else:
+                        error_details = response.json().get("detail", "Unknown error")
+                        st.error(f"Error uploading file: {error_details}")
                 except Exception as e:
-                    st.error(f"Error uploading documents: {e}")
-              
+                    st.error(f"Error uploading file: {e}")
+            else:
+                st.warning("Please choose a file to upload.")
+    elif choice == "Ask Questions":
+        st.subheader("Ask a Question")
+        query = st.text_area("Enter your query")
+        if st.button("Submit"):
+            st.info(f"Processing your query...{query}")
+            if query.strip() != "":
+                payload = {"query": query}
+                try:
+                    response = requests.post(f"{FASTAPI_URL}/ask", json=payload)
+                    if response.status_code == 200:
+                        response_text = response.json().get("response", "No response")
+                        st.success(response_text)
+                    else:
+                        error_details = response.json().get("detail", "Unknown error")
+                        st.error(f"Error processing query: {error_details}")
+                except Exception as e:
+                    st.error(f"Error processing query: {e}")
+            else:
+                st.warning("Please enter a query to ask.")
+    elif choice == "Manage Documents":
+        st.subheader("Manage Documents")
+        result = list_files()
+        files = result.get("files", [])
+        if files:
+            st.write("List of uploaded documents:")
+            for file in files:
+                st.write(f"UUID: {file['uuid']}, Filename: {file['original_filename']}, status: {file['status']}, uploaded on: {file['upload_timestamp']}")
+        else:
+            st.warning("No documents found.")
 
-
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Ask Questions", "Upload Documents"], key="navigation")
-
-if page == "Ask Questions":
-    ask_questions()
-elif page == "Upload Documents":
-    # from app.upload import upload_documents
-    upload_documents()
-    
-
-
+if __name__ == "__main__":
+    main()

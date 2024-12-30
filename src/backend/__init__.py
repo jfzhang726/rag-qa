@@ -1,5 +1,5 @@
 # backend/__init__.py
-
+import dotenv
 import logging
 logging.basicConfig(
     level=logging.INFO,
@@ -9,3 +9,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+
+
+dotenv.load_dotenv()

@@ -1,3 +1,6 @@
+# asyncpg
+aiosqlite
+fastapi
 langchain
 langchainhub 
 langchain_chroma
@@ -8,3 +11,4 @@ openai
 pydantic<2
 ragas
 unstructured[pdf]
+uvicorn
